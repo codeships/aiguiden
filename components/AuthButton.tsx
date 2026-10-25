@@ -19,12 +19,11 @@ export function GoogleMark({ size = 18 }: { size?: number }) {
 
 /** The standard Google sign-in button. */
 export function GoogleSignInButton({ label = "Sign in with Google", compact = false }: { label?: string; compact?: boolean }) {
-  const { signInWithGoogle, loading } = useAuth();
+  const { signInWithGoogle } = useAuth();
   return (
     <button
       type="button"
       onClick={signInWithGoogle}
-      disabled={loading}
       aria-label={label}
       className={`inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-full border border-[#dadce0] bg-white text-[0.95rem] font-semibold text-[#1f1f1f] hover:bg-[#f8faff] disabled:opacity-50 ${
         compact ? "px-2.5 sm:px-3.5" : "px-3.5"
@@ -51,7 +50,7 @@ function Avatar({ name, photoURL }: { name: string | null; photoURL: string | nu
 
 /** Header control: sign-in button when signed out, avatar menu when signed in. */
 export function AuthButton() {
-  const { configured, loading, user, signOut } = useAuth();
+  const { configured, user, signOut } = useAuth();
   const router = useRouter();
   const menuRef = useRef<HTMLDetailsElement>(null);
 
@@ -65,7 +64,6 @@ export function AuthButton() {
   }, []);
 
   if (!configured) return null;
-  if (loading) return <span className="inline-block h-8 w-8 rounded-full bg-[var(--line)]" aria-label="Checking sign-in" />;
 
   if (!user) {
     // Signed out: go to the sign-in page, then come back to this exact page.

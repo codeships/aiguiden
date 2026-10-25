@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
-import { AuthButton } from "@/components/AuthButton";
+import { HeaderAuth, HeroCta } from "@/components/HeaderAuth";
 import { analyticsConfigured } from "@/lib/firebase/config";
 import { GUIDES } from "@/lib/guides";
 import { GREETINGS, LANGUAGES } from "@/lib/languages";
@@ -22,12 +22,7 @@ export default function Home() {
     <div className="flex min-h-full flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <Logo />
-        <div className="flex items-center gap-2">
-          <Link href="/chat" className="btn-quiet">
-            Open the app
-          </Link>
-          <AuthButton />
-        </div>
+        <HeaderAuth />
       </header>
 
       <main className="flex-1">
@@ -41,12 +36,7 @@ export default function Home() {
               Wiseyarn is an AI guide for farming, health, money, school, jobs and your rights. It knows naira from
               cedis, the rainy season from the harmattan, and M-Pesa from a bank transfer.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link href="/chat" className="btn-gold text-lg">
-                Start asking
-              </Link>
-              <span className="text-ink-soft">Free to try. Light on data.</span>
-            </div>
+            <HeroCta />
           </div>
 
           <div className="adire relative overflow-hidden rounded-[28px] p-6 sm:p-8" aria-label="Greetings in African languages">

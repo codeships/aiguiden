@@ -12,11 +12,33 @@ import { safeNext } from "@/lib/safe-next";
 const WALL = GREETINGS.slice(0, 12);
 const SIZES = ["text-4xl", "text-2xl", "text-3xl", "text-xl", "text-5xl", "text-2xl"];
 
-export function SignInScreen() {
+type Mode = "signin" | "signup";
+
+const COPY: Record<Mode, { title: string; lead: string; button: string; switchText: string; switchLink: string; switchHref: string }> = {
+  signin: {
+    title: "Sign in to Wiseyarn",
+    lead: "Welcome back. Use your Google account to pick up where you left off.",
+    button: "Sign in with Google",
+    switchText: "New to Wiseyarn?",
+    switchLink: "Create a free account",
+    switchHref: "/signup",
+  },
+  signup: {
+    title: "Create your Wiseyarn account",
+    lead: "It’s free and takes one tap with your Google account. No password to remember.",
+    button: "Sign up with Google",
+    switchText: "Already have an account?",
+    switchLink: "Sign in",
+    switchHref: "/signin",
+  },
+};
+
+export function SignInScreen({ mode = "signin" }: { mode?: Mode }) {
+  const copy = COPY[mode];
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get("next"));
-  const { configured, loading, user, error, signInWithGoogle, signOut, clearError } = useAuth();
+  const { configured, user, error, signInWithGoogle, signOut, clearError } = useAuth();
 
   // Signed in (now, or already when the page opened): go on to where they were heading.
   useEffect(() => {
@@ -84,20 +106,17 @@ export function SignInScreen() {
             </>
           ) : (
             <>
-              <h1 className="font-display text-4xl leading-tight font-extrabold tracking-tight">Sign in to Wiseyarn</h1>
-              <p className="mt-3 text-ink-soft">
-                Use your Google account to start asking. It’s free, and there’s no password to remember.
-              </p>
+              <h1 className="font-display text-4xl leading-tight font-extrabold tracking-tight">{copy.title}</h1>
+              <p className="mt-3 text-ink-soft">{copy.lead}</p>
 
               {configured ? (
                 <button
                   type="button"
                   onClick={signInWithGoogle}
-                  disabled={loading}
-                  className="mt-8 inline-flex min-h-13 w-full items-center justify-center gap-3 rounded-full border border-[#dadce0] bg-white px-5 text-base font-semibold text-[#1f1f1f] hover:bg-[#f8faff] disabled:opacity-50"
+                  className="mt-8 inline-flex min-h-13 w-full items-center justify-center gap-3 rounded-full border border-[#dadce0] bg-white px-5 text-base font-semibold text-[#1f1f1f] shadow-sm hover:bg-[#f8faff]"
                 >
                   <GoogleMark size={20} />
-                  Continue with Google
+                  {copy.button}
                 </button>
               ) : (
                 <p className="mt-8 rounded-2xl border border-line bg-surface p-4 text-sm">
@@ -113,6 +132,16 @@ export function SignInScreen() {
                   </button>
                 </p>
               )}
+
+              <p className="mt-6 text-center">
+                {copy.switchText}{" "}
+                <Link
+                  href={`${copy.switchHref}${params.get("next") ? `?next=${encodeURIComponent(next)}` : ""}`}
+                  className="font-semibold underline underline-offset-4"
+                >
+                  {copy.switchLink}
+                </Link>
+              </p>
 
               <p className="mt-8 text-sm text-ink-soft">
                 Wiseyarn only sees your name, email and profile photo. It never posts to your Google account, and

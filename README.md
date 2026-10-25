@@ -58,7 +58,7 @@ Google sign-in uses **Firebase Authentication**; usage stats use **Firebase Anal
 
 - `components/AuthProvider.tsx` — Firebase session in React; Google popup sign-in with an automatic redirect fallback for phones and in-app browsers (WhatsApp, Facebook) that block popups.
 - `lib/firebase/verify.ts` — the server checks every signed-in request's Firebase ID token against Google's public keys (no service-account file needed). Invalid tokens get a 401.
-- **Sign-in page** at `/signin` (`components/SignInScreen.tsx`): Google sign-in, then back to where the person was heading via `?next=` (same-site paths only — `lib/safe-next.ts`). Already signed-in visitors are sent straight on.
+- **Sign-in and sign-up pages** at `/signin` and `/signup` (`components/SignInScreen.tsx`), linked from the home-page header and hero (`components/HeaderAuth.tsx`). Both use Google; first-time Google sign-ins are recorded as `sign_up` in Analytics. Each page: Google sign-in, then back to where the person was heading via `?next=` (same-site paths only — `lib/safe-next.ts`). Already signed-in visitors are sent straight on.
 - Sign-in is **required** to chat: signed-out visitors can read the home page, and opening the chat sends them to `/signin`, and `/api/chat` returns 401 without a valid Firebase token. Set `WISEYARN_REQUIRE_SIGN_IN=false` to make it optional.
 - Signed-in users are rate-limited per account (`WISEYARN_RATE_LIMIT_SIGNED_IN`, default 40/min) instead of per network address, and their Firebase uid is attached to LangSmith traces as `user_id`.
 

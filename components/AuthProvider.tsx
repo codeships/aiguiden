@@ -68,6 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseConfigured) return;
     let unsub: (() => void) | undefined;
     let cancelled = false;
+    // On slow or blocked connections, don't leave the UI waiting forever.
+    const giveUp = setTimeout(() => setLoading(false), 8000);
 
     (async () => {
       try {
@@ -89,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       cancelled = true;
+      clearTimeout(giveUp);
       unsub?.();
     };
   }, []);
