@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AIGuiden
 
-## Getting Started
+An AI guide for Africa and beyond. Pick a guide — Farm, Health, Money & Business, Learn, Jobs & Skills, Rights & Civic, or Everyday — choose your language, and ask in plain words. Built with **Next.js 16** and **LangChain JS v1**, traced in **LangSmith**.
 
-First, run the development server:
+The full product brief and the AI's system prompt are in [`PROMPT.md`](./PROMPT.md).
+
+## Run it
 
 ```bash
+npm install
+cp .env.example .env.local   # then paste your LangSmith key into LANGSMITH_API_KEY
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. It answers straight away: with no key at all it uses a free model (gpt-oss-20b via [Pollinations.ai](https://pollinations.ai), no sign-up). Add a LangSmith or OpenAI key for stronger answers, especially in Hausa, Yorùbá, Igbo and other African languages.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### The AI: LangChain's LangSmith LLM Gateway
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+By default AIGuiden sends every model call through the [LangSmith LLM Gateway](https://docs.langchain.com/langsmith/llm-gateway-quickstart) (`https://gateway.smith.langchain.com/v1`, OpenAI-compatible), using the same `LANGSMITH_API_KEY` as tracing. One key does both. The gateway needs one of:
 
-## Learn More
+- **Gateway Credits** in your LangSmith account (paid plans) — then hosted models like `moonshotai/Kimi-K2.6` (default) or `moonshotai/Kimi-K3` work, or
+- **Your own provider key**: an admin enables the gateway for the organization, saves your OpenAI key as a workspace secret, and you set `AIGUIDEN_MODEL=openai/gpt-4.1-mini`.
 
-To learn more about Next.js, take a look at the following resources:
+If neither is set up, LangChain's `modelFallbackMiddleware` automatically answers with the free model instead, so the chat never stops working. Set `AIGUIDEN_FREE_MODEL=false` to turn the free model off (questions sent to it go to Pollinations.ai).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Other providers (direct)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Set `AIGUIDEN_PROVIDER` to skip the gateway.
 
-## Deploy on Vercel
+| Provider | Env vars | Default model |
+| --- | --- | --- |
+| LangSmith gateway (default) | `LANGSMITH_API_KEY` | `moonshotai/Kimi-K2.6` |
+| Free, no key (automatic) | none | `gpt-oss-20b` via Pollinations.ai |
+| OpenAI | `OPENAI_API_KEY` | `gpt-5-mini` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` |
+| Google Gemini | `GOOGLE_API_KEY` | `gemini-2.5-flash` |
+| Groq / OpenRouter / Together / Ollama | `AIGUIDEN_PROVIDER=compatible`, `AIGUIDEN_BASE_URL`, `AIGUIDEN_API_KEY`, `AIGUIDEN_MODEL` | `llama-3.3-70b-versatile` |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Override the model with `AIGUIDEN_MODEL`. See `.env.example` for everything.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### LangSmith
+
+With `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT=aiguiden`, every chat shows up at smith.langchain.com under the **aiguiden** project: the system prompt, each model call, each tool call and its result. Runs carry the guide, language, country and model as metadata so you can filter them.
+
+## How it works
+
+```
+components/ChatApp.tsx  ── POST /api/chat ──▶ app/api/chat/route.ts
+                                               └─ lib/ai/agent.ts  createAgent({ model, tools, systemPrompt })
+                                                    ├─ lib/ai/model.ts    LangSmith gateway / provider factory
+                                                    ├─ lib/ai/tools.ts    calculator, exchange_rate, country_facts,
+                                                    │                     current_time, web_search (if TAVILY_API_KEY)
+                                                    └─ lib/ai/prompts.ts  system prompt from guide + language + country
+                        ◀── NDJSON stream: token / tool / done / error
+```
+
+- **Agent:** `createAgent` from `langchain` (a LangGraph tool-calling loop), streamed with `streamMode: "messages"` so tokens reach the phone as they're written.
+- **Guides:** `lib/guides.ts` — add a guide by adding an entry (name, focus, rules, starter questions, colour).
+- **Languages:** `lib/languages.ts`. **Countries:** `lib/countries.ts` (54 African countries).
+- **Privacy:** chats are stored only in the browser (localStorage). The server keeps nothing.
+- **Limits:** 20 messages per minute per IP (in-memory), last 20 turns sent to the model, 8,000 characters per message.
+
+## Deploy
+
+Works on Vercel or any Node host (`npm run build && npm start`). Set the same env vars in the host's settings. For more than one server instance, replace `lib/rate-limit.ts` with Redis/Upstash.
+
+## Next steps
+
+Voice in and out, WhatsApp and USSD channels, RAG over local documents (extension bulletins, syllabuses), accounts and sync, offline PWA.
