@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { ChatApp } from "@/components/ChatApp";
 
 export const metadata: Metadata = {
-  title: "Chat — AIGuiden",
+  title: "Chat — Wiseyarn",
 };
 
 export default function ChatPage() {

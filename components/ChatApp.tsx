@@ -8,6 +8,11 @@ import { Logo } from "@/components/Logo";
 import { GUIDES, getGuide, type GuideId } from "@/lib/guides";
 import { LANGUAGES, getLanguage } from "@/lib/languages";
 import { COUNTRIES } from "@/lib/countries";
+import { useAuth } from "@/components/AuthProvider";
+import { AuthButton } from "@/components/AuthButton";
+import Link from "next/link";
+import { signInHref } from "@/lib/safe-next";
+import { track } from "@/lib/analytics";
 
 type Role = "user" | "assistant";
 interface Msg {
@@ -27,8 +32,10 @@ interface Status {
   model: string | null;
   search: boolean;
   tracing: boolean;
+  requireSignIn: boolean;
 }
 
+// Storage keys keep the old "aiguiden" prefix so chats saved before the rename aren't lost.
 const PREFS_KEY = "aiguiden:v1:prefs";
 const chatKey = (g: string) => `aiguiden:v1:chat:${g}`;
 
@@ -60,6 +67,7 @@ export function ChatApp() {
   const router = useRouter();
   const params = useSearchParams();
   const guide = getGuide(params.get("guide"));
+  const auth = useAuth();
 
   const [prefs, setPrefs] = useState<Prefs>({ language: "en", country: "", lite: false });
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -101,10 +109,22 @@ export function ChatApp() {
     endRef.current?.scrollIntoView({ behavior: prefs.lite ? "auto" : "smooth", block: "end" });
   }, [messages, toolNote, prefs.lite]);
 
+  // When the server requires sign-in, signed-out people see a sign-in prompt instead of the composer.
+  const mustSignIn = Boolean(status?.requireSignIn && auth.configured && !auth.user && !auth.loading);
+
+  // Sign-in required and nobody signed in: go to the sign-in page, then come back to this guide.
+  useEffect(() => {
+    if (mustSignIn) router.replace(signInHref(`/chat?guide=${guide.id}`));
+  }, [mustSignIn, guide.id, router]);
+
   const send = useCallback(
-    async (text: string, base?: Msg[]) => {
+    async (text: string, base?: Msg[], starter = false) => {
       const content = text.trim();
       if (!content || busy) return;
+      if (mustSignIn) {
+        router.push(signInHref(`/chat?guide=${guide.id}`));
+        return;
+      }
       const history: Msg[] = [...(base ?? messages).filter((m) => !m.error), { role: "user", content }];
       setMessages([...history, { role: "assistant", content: "" }]);
       setInput("");
@@ -114,6 +134,15 @@ export function ChatApp() {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       let answer = "";
+      let toolsUsed = 0;
+      const started = performance.now();
+      track("ask_question", {
+        guide: guide.id,
+        language: prefs.language,
+        country: prefs.country || "unset",
+        signed_in: Boolean(auth.user),
+        starter,
+      });
 
       const update = (patch: Partial<Msg>) =>
         setMessages((prev) => {
@@ -123,9 +152,13 @@ export function ChatApp() {
         });
 
       try {
+        const idToken = await auth.getIdToken();
         const res = await fetch("/api/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          },
           body: JSON.stringify({
             messages: history.map(({ role, content }) => ({ role, content })),
             guide: guide.id,
@@ -135,8 +168,10 @@ export function ChatApp() {
           signal: ctrl.signal,
         });
         if (!res.ok || !res.body) {
-          const err = await res.json().catch(() => ({ error: "The server didn’t answer. Check your connection and try again." }));
-          throw new Error(err.error);
+          const err = await res
+            .json()
+            .catch(() => ({ error: "The server didn’t answer. Check your connection and try again." }));
+          throw Object.assign(new Error(err.error), { code: err.code ?? `http_${res.status}` });
         }
 
         const reader = res.body.getReader();
@@ -156,18 +191,32 @@ export function ChatApp() {
               setToolNote(null);
               update({ content: answer });
             } else if (ev.type === "tool" && ev.name) {
+              toolsUsed++;
               setToolNote(TOOL_LABELS[ev.name] ?? `Using ${ev.name}`);
             } else if (ev.type === "error") {
-              throw new Error(ev.message);
+              throw Object.assign(new Error(ev.message), { code: "model_error" });
             }
           }
         }
-        if (!answer) update({ content: "No answer came back. Try asking again.", error: true });
+        if (!answer) {
+          update({ content: "No answer came back. Try asking again.", error: true });
+          track("answer_error", { guide: guide.id, reason: "empty" });
+        } else {
+          track("answer_received", {
+            guide: guide.id,
+            language: prefs.language,
+            duration_ms: Math.round(performance.now() - started),
+            tools_used: toolsUsed,
+            chars: answer.length,
+          });
+        }
       } catch (e) {
         if (ctrl.signal.aborted) {
+          track("answer_stopped", { guide: guide.id });
           if (!answer) update({ content: "Stopped.", error: true });
         } else {
-          const msg = (e as Error).message || "Couldn’t reach AIGuiden. Check your connection and try again.";
+          track("answer_error", { guide: guide.id, reason: (e as { code?: string }).code ?? "network" });
+          const msg = (e as Error).message || "Couldn’t reach Wiseyarn. Check your connection and try again.";
           update({ content: answer ? `${answer}\n\n_${msg}_` : msg, error: true });
         }
       } finally {
@@ -177,7 +226,7 @@ export function ChatApp() {
         inputRef.current?.focus();
       }
     },
-    [busy, messages, guide.id, prefs.language, prefs.country],
+    [busy, messages, guide.id, prefs.language, prefs.country, mustSignIn, auth, router],
   );
 
   const retry = () => {
@@ -189,11 +238,13 @@ export function ChatApp() {
 
   const switchGuide = (id: GuideId) => {
     if (busy) abortRef.current?.abort();
+    track("select_guide", { guide: id });
     router.replace(`/chat?guide=${id}`, { scroll: false });
   };
 
   const clearChat = () => {
     abortRef.current?.abort();
+    track("clear_chat", { guide: guide.id });
     setMessages([]);
     save(chatKey(guide.id), []);
   };
@@ -207,15 +258,18 @@ export function ChatApp() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
           <Logo compact />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 items-center gap-2">
             <label className="sr-only" htmlFor="lang">
               Answer language
             </label>
             <select
               id="lang"
-              className="btn-quiet max-w-[7.5rem] px-2.5 text-sm sm:max-w-none sm:px-3.5"
+              className="btn-quiet max-w-[6.5rem] min-w-0 px-2.5 text-sm sm:max-w-none sm:px-3.5"
               value={prefs.language}
-              onChange={(e) => setPrefs({ ...prefs, language: e.target.value })}
+              onChange={(e) => {
+                setPrefs({ ...prefs, language: e.target.value });
+                track("change_language", { language: e.target.value });
+              }}
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
@@ -228,9 +282,12 @@ export function ChatApp() {
             </label>
             <select
               id="country"
-              className="btn-quiet max-w-[7.5rem] px-2.5 text-sm sm:max-w-[12rem] sm:px-3.5"
+              className="btn-quiet max-w-[6.5rem] min-w-0 px-2.5 text-sm sm:max-w-[12rem] sm:px-3.5"
               value={prefs.country}
-              onChange={(e) => setPrefs({ ...prefs, country: e.target.value })}
+              onChange={(e) => {
+                setPrefs({ ...prefs, country: e.target.value });
+                track("change_country", { country: e.target.value || "unset" });
+              }}
             >
               <option value="">Country…</option>
               {COUNTRIES.map((c) => (
@@ -240,6 +297,7 @@ export function ChatApp() {
               ))}
               <option value="Elsewhere">Outside Africa</option>
             </select>
+            <AuthButton />
           </div>
         </div>
 
@@ -281,7 +339,7 @@ export function ChatApp() {
       <main className="flex-1 overflow-y-auto" aria-live="polite">
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           {messages.length === 0 ? (
-            <EmptyState guide={guide} onPick={(q) => send(q)} languageName={lang.native} />
+            <EmptyState guide={guide} onPick={(q) => send(q, undefined, true)} languageName={lang.native} />
           ) : (
             <ol className="space-y-5">
               {messages.map((m, i) => (
@@ -331,7 +389,7 @@ export function ChatApp() {
                           <p className="mt-2 text-sm text-ink-soft">{toolNote}…</p>
                         )}
                         {m.content && !(busy && i === messages.length - 1) && !m.error && (
-                          <CopyButton text={m.content} />
+                          <CopyButton text={m.content} onCopy={() => track("copy_answer", { guide: guide.id })} />
                         )}
                       </div>
                     </div>
@@ -346,6 +404,14 @@ export function ChatApp() {
 
       {/* Composer */}
       <footer className="border-t border-line bg-surface">
+        {mustSignIn ? (
+          <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+            <p className="text-ink-soft">Sign in to ask Wiseyarn. It’s free.</p>
+            <Link href={signInHref(`/chat?guide=${guide.id}`)} className="btn-gold">
+              Sign in
+            </Link>
+          </div>
+        ) : (
         <form
           className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 py-3 sm:px-6"
           onSubmit={(e) => {
@@ -383,6 +449,7 @@ export function ChatApp() {
             </button>
           )}
         </form>
+        )}
         <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-3 text-xs text-ink-soft sm:px-6">
           {messages.length > 0 && !busy && (
             <>
@@ -400,7 +467,10 @@ export function ChatApp() {
             type="button"
             className="underline"
             aria-pressed={prefs.lite}
-            onClick={() => setPrefs({ ...prefs, lite: !prefs.lite })}
+            onClick={() => {
+              setPrefs({ ...prefs, lite: !prefs.lite });
+              track("toggle_lite_mode", { on: !prefs.lite });
+            }}
             title="Turns off motion to save battery"
           >
             {prefs.lite ? "Lite mode: on" : "Lite mode: off"}
@@ -456,7 +526,7 @@ function EmptyState({
   );
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, onCopy }: { text: string; onCopy?: () => void }) {
   const [done, setDone] = useState(false);
   return (
     <button
@@ -465,6 +535,7 @@ function CopyButton({ text }: { text: string }) {
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
+          onCopy?.();
           setDone(true);
           setTimeout(() => setDone(false), 1500);
         } catch {

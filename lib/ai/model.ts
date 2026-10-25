@@ -3,6 +3,7 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { setting } from "@/lib/env";
 
 export type Provider = "langsmith" | "openai" | "anthropic" | "google" | "compatible" | "free";
 
@@ -30,16 +31,16 @@ const DEFAULT_MODELS: Record<Provider, string> = {
 
 export const FREE_MODEL_LABEL = "free model (gpt-oss-20b via Pollinations.ai)";
 
-const freeEnabled = () => process.env.AIGUIDEN_FREE_MODEL !== "false";
+const freeEnabled = () => setting("FREE_MODEL") !== "false";
 
 /**
  * Work out which provider to use from the environment.
- * Order: AIGUIDEN_PROVIDER → LangSmith gateway (LANGSMITH_API_KEY) → direct provider
+ * Order: WISEYARN_PROVIDER → LangSmith gateway (LANGSMITH_API_KEY) → direct provider
  * keys → the free keyless model.
  */
 export function resolveModelConfig(): ModelConfig {
   const env = process.env;
-  const explicit = env.AIGUIDEN_PROVIDER?.toLowerCase() as Provider | undefined;
+  const explicit = setting("PROVIDER")?.toLowerCase() as Provider | undefined;
 
   let provider: Provider | null = null;
   if (explicit && explicit in DEFAULT_MODELS) provider = explicit;
@@ -47,7 +48,7 @@ export function resolveModelConfig(): ModelConfig {
   else if (env.OPENAI_API_KEY) provider = "openai";
   else if (env.ANTHROPIC_API_KEY) provider = "anthropic";
   else if (env.GOOGLE_API_KEY) provider = "google";
-  else if (env.AIGUIDEN_BASE_URL && env.AIGUIDEN_API_KEY) provider = "compatible";
+  else if (setting("BASE_URL") && setting("API_KEY")) provider = "compatible";
 
   if (provider && !hasKey(provider)) provider = null;
   if (!provider && freeEnabled()) provider = "free";
@@ -55,10 +56,10 @@ export function resolveModelConfig(): ModelConfig {
   const usesCustomModel = provider !== "free" || explicit === "free";
   return {
     provider,
-    model: (usesCustomModel && env.AIGUIDEN_MODEL) || (provider ? DEFAULT_MODELS[provider] : "none"),
+    model: (usesCustomModel && setting("MODEL")) || (provider ? DEFAULT_MODELS[provider] : "none"),
     baseURL:
       provider === "compatible"
-        ? env.AIGUIDEN_BASE_URL
+        ? setting("BASE_URL")
         : provider === "langsmith"
           ? env.LANGSMITH_GATEWAY_URL || LANGSMITH_GATEWAY_URL
           : provider === "free"
@@ -79,7 +80,7 @@ function hasKey(p: Provider): boolean {
     case "google":
       return Boolean(env.GOOGLE_API_KEY);
     case "compatible":
-      return Boolean(env.AIGUIDEN_BASE_URL && env.AIGUIDEN_API_KEY);
+      return Boolean(setting("BASE_URL") && setting("API_KEY"));
     case "free":
       return true;
   }
@@ -87,8 +88,8 @@ function hasKey(p: Provider): boolean {
 
 /** Build the LangChain chat model for the configured provider. */
 export function createChatModel(cfg = resolveModelConfig()): BaseChatModel {
-  const temperature = Number(process.env.AIGUIDEN_TEMPERATURE ?? 0.4);
-  const customTemp = process.env.AIGUIDEN_TEMPERATURE ? { temperature } : {};
+  const temperature = Number(setting("TEMPERATURE") ?? 0.4);
+  const customTemp = setting("TEMPERATURE") ? { temperature } : {};
   switch (cfg.provider) {
     case "langsmith":
       // LangChain's LangSmith LLM Gateway is OpenAI-compatible and authenticates
@@ -131,7 +132,7 @@ export function createChatModel(cfg = resolveModelConfig()): BaseChatModel {
       // Groq, OpenRouter, Together, Ollama (http://localhost:11434/v1) and others.
       return new ChatOpenAI({
         model: cfg.model,
-        apiKey: process.env.AIGUIDEN_API_KEY,
+        apiKey: setting("API_KEY"),
         temperature,
         streaming: true,
         maxRetries: 2,

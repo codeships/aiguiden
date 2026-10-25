@@ -1,14 +1,14 @@
-# AIGuiden — build prompt
+# Wiseyarn — build prompt
 
 This is the prompt the app was built from. Hand it to any coding model (or a
-developer) to rebuild, extend, or audit AIGuiden. The runtime system prompt
+developer) to rebuild, extend, or audit Wiseyarn. The runtime system prompt
 the AI itself uses lives in `lib/ai/prompts.ts` and is reproduced at the end.
 
 ---
 
 ## 1. Product
 
-**AIGuiden** is an AI guide for Africa and beyond. A person opens it on a
+**Wiseyarn** is an AI guide for Africa and beyond. A person opens it on a
 phone, picks a guide (farming, health, money and business, learning, jobs,
 everyday rights), picks their language, and asks a question in plain words.
 They get a short, practical answer that fits where they live — local crops
@@ -49,11 +49,13 @@ and the AI adapts to the country the user names.
 | Models | Provider-agnostic through LangChain: OpenAI, Anthropic, Google Gemini, or any OpenAI-compatible endpoint (Groq, OpenRouter, Together, a local Ollama). Chosen by env vars. |
 | Demo mode | With no API key the app still runs and tells the user how to add one. |
 | Low bandwidth | One page of JS for the chat, no images in the core flow, system-font fallback, "Lite mode" toggle that turns off motion. |
+| Accounts | Google sign-in with Firebase Authentication (optional by default, can be required). Server verifies Firebase ID tokens. |
+| Analytics | Firebase Analytics (GA4): guide, question, answer, language and sign-in events. Never message content. |
 | Safety | Per-IP rate limit, input length cap, history trimmed to the last 20 turns, no keys in the browser. |
 
 ### Out of scope for v1 (next steps)
 
-Accounts and sync, voice in/out, WhatsApp/USSD channels, RAG over local
+Chat sync across devices (Firestore), voice in/out, WhatsApp/USSD channels, RAG over local
 documents (extension ministry bulletins, school syllabuses), offline PWA.
 
 ## 3. Architecture
@@ -91,7 +93,7 @@ GET /api/status → which provider/model is active, whether search is on
 ## 5. Runtime system prompt (what the AI is told)
 
 ```
-You are AIGuiden, a practical AI guide built for people in Africa and the
+You are Wiseyarn, a practical AI guide built for people in Africa and the
 African diaspora, and useful to anyone anywhere.
 
 Guide: {guide.name} — {guide.focus}

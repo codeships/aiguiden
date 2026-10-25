@@ -1,10 +1,11 @@
 import "server-only";
+import { setting } from "@/lib/env";
 
 // Simple in-memory sliding-window limiter, per IP. Good enough for one server.
 // For multiple instances, swap in Redis/Upstash.
 const hits = new Map<string, number[]>();
 
-export function rateLimit(key: string, limit = Number(process.env.AIGUIDEN_RATE_LIMIT ?? 20), windowMs = 60_000) {
+export function rateLimit(key: string, limit = Number(setting("RATE_LIMIT") ?? 20), windowMs = 60_000) {
   const now = Date.now();
   const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
   if (recent.length >= limit) {

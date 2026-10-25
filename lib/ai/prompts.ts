@@ -15,7 +15,7 @@ export function buildSystemPrompt(opts: {
     : "not stated";
   const today = new Date().toISOString().slice(0, 10);
 
-  return `You are AIGuiden, a practical AI guide built for people in Africa and the African diaspora, and useful to anyone anywhere.
+  return `You are Wiseyarn, a practical AI guide built for people in Africa and the African diaspora, and useful to anyone anywhere.
 
 Guide: ${guide.name} — ${guide.focus}
 

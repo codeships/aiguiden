@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { AuthButton } from "@/components/AuthButton";
+import { analyticsConfigured } from "@/lib/firebase/config";
 import { GUIDES } from "@/lib/guides";
 import { GREETINGS, LANGUAGES } from "@/lib/languages";
 
@@ -20,9 +22,12 @@ export default function Home() {
     <div className="flex min-h-full flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <Logo />
-        <Link href="/chat" className="btn-quiet">
-          Open the app
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/chat" className="btn-quiet">
+            Open the app
+          </Link>
+          <AuthButton />
+        </div>
       </header>
 
       <main className="flex-1">
@@ -33,7 +38,7 @@ export default function Home() {
               Ask in your own language. Get answers that fit where you live.
             </h1>
             <p className="mt-5 max-w-xl text-lg text-ink-soft">
-              AIGuiden is an AI guide for farming, health, money, school, jobs and your rights. It knows naira from
+              Wiseyarn is an AI guide for farming, health, money, school, jobs and your rights. It knows naira from
               cedis, the rainy season from the harmattan, and M-Pesa from a bank transfer.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -130,8 +135,14 @@ export default function Home() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-ink-soft sm:px-6">
-          <span>AIGuiden — for Africa and beyond.</span>
+          <span>Wiseyarn — for Africa and beyond.</span>
           <span>AI can make mistakes. For health, legal and money decisions, check with a professional.</span>
+          {analyticsConfigured && (
+            <span className="w-full">
+              We use Google Analytics to learn which guides help most. It never records what you type or the answers
+              you get.
+            </span>
+          )}
         </div>
       </footer>
     </div>

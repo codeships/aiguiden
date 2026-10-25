@@ -18,6 +18,7 @@ export interface ChatRequest {
   guide?: string;
   language?: string;
   country?: string;
+  userId?: string; // Firebase uid when signed in (pseudonymous; used for LangSmith filtering)
 }
 
 export type StreamEvent =
@@ -37,7 +38,7 @@ function chunkText(content: BaseMessage["content"]): string {
 }
 
 /**
- * Run the AIGuiden LangChain agent and yield UI events as they happen.
+ * Run the Wiseyarn LangChain agent and yield UI events as they happen.
  * The agent is a tool-calling loop (LangGraph under the hood) built with createAgent.
  */
 export async function* runGuide(
@@ -52,7 +53,7 @@ export async function* runGuide(
   const tools = getTools();
 
   const agent = createAgent({
-    name: "aiguiden",
+    name: "wiseyarn",
     model: modelOverride ?? createChatModel(cfg),
     tools,
     // If the main model fails before answering (no LangSmith credits, outage, bad key),
@@ -75,7 +76,7 @@ export async function* runGuide(
       signal,
       recursionLimit: 12,
       // Shows up as metadata on each LangSmith trace, so runs can be filtered by guide/language.
-      configurable: { guide: guide.id, language: language.code, country: country?.code ?? "unset", model: cfg.model },
+      configurable: { guide: guide.id, language: language.code, country: country?.code ?? "unset", model: cfg.model, user_id: req.userId ?? "anonymous" },
     },
   );
 

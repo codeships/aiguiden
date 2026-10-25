@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/components/AuthProvider";
 
 const body = Atkinson_Hyperlegible({
   variable: "--font-body",
@@ -16,10 +17,10 @@ const display = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "AIGuiden — an AI guide for Africa and beyond",
+  title: "Wiseyarn — an AI guide for Africa and beyond",
   description:
     "Ask about farming, health, money, school, jobs and your rights — in English, Pidgin, Hausa, Yorùbá, Igbo, Swahili, French, Arabic and more.",
-  applicationName: "AIGuiden",
+  applicationName: "Wiseyarn",
 };
 
 export const viewport: Viewport = {
@@ -34,7 +35,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${body.variable} ${display.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
