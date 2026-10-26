@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { SocialLinks } from "@/components/SocialLinks";
 import { HeaderAuth, HeroCta } from "@/components/HeaderAuth";
 import { analyticsConfigured } from "@/lib/firebase/config";
 import { GUIDES } from "@/lib/guides";
@@ -126,7 +127,8 @@ export default function Home() {
       <footer className="border-t border-line">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-ink-soft sm:px-6">
           <span>Wiseyarn — for Africa and beyond.</span>
-          <span>AI can make mistakes. For health, legal and money decisions, check with a professional.</span>
+          <SocialLinks />
+          <span className="w-full">AI can make mistakes. For health, legal and money decisions, check with a professional.</span>
           {analyticsConfigured && (
             <span className="w-full">
               We use Google Analytics to learn which guides help most. It never records what you type or the answers
